@@ -315,7 +315,9 @@ static void bms_cmd_handler(uint8_t cmd, const uint8_t *data, uint8_t len,
 /* ---------------- 低功耗 ---------------- */
 static bool charger_present(void)
 {
-    return HAL_GPIO_ReadPin(CHG_DET_GPIO_Port, CHG_DET_Pin) == GPIO_PIN_SET;
+    /* 用电流方向判断，不依赖 CHG_DET 引脚：
+     * 12.6V 直连 PB5 会烧 IO（见 docs/01-hardware.md 3.4），省掉分压电路就用这个办法。 */
+    return s_current_ma > 50;
 }
 
 /* 静置 10s（无充放电、无故障、上位机不通讯）后进 STOP：

@@ -54,7 +54,7 @@ Program Size: Code=19298 RO-data=650 RW-data=136 ZI-data=2216
 | PA10 | USART1_RX | USART1_RX | — |
 | PB0 | EXTI0 | GPIO_EXTI0 | ALERT |
 | PB1 | GPIO | GPIO_Output | BOOT |
-| PB5 | GPIO | GPIO_Input | CHG_DET |
+| PB5 | GPIO | GPIO_Input | CHG_DET（可选，默认不用；12.6V 直连会烧 IO） |
 | PB6 | I2C1_SCL | I2C1_SCL | — |
 | PB7 | I2C1_SDA | I2C1_SDA | — |
 | PB12 | GPIO | GPIO_Output | LED |
