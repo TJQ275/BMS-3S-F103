@@ -15,13 +15,14 @@
 *.htm
 *.uvguix.*
 *.uvoptx
+*.sct
 *.bak
 *.__i
 *._ia
-MDK-ARM/BMS-3S-F103/
-MDK-ARM/RTE/
-MDK-ARM/DebugConfig/
-MDK-ARM/build.log
+**/MDK-ARM/BMS-3S-F103/
+**/MDK-ARM/RTE/
+**/MDK-ARM/DebugConfig/
+**/MDK-ARM/build.log
 
 # ---------- 主机端自测 ----------
 host_check/build/
