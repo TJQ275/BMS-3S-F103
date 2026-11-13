@@ -80,6 +80,10 @@
 #define CFG_SOC_MIN_PCT          0.0f
 #define CFG_SOC_MAX_PCT          100.0f
 
+/* ========================= 5.5 低功耗 ========================= */
+#define CFG_LP_ENABLE            1   /* 1=静置 10s 后进 STOP；调试时置 0 保持常开 */
+#define CFG_LP_IDLE_S            10  /* 静置多久进 STOP */
+
 /* ========================= 6. 任务周期 ========================= */
 #define BMS_TASK_FAST_MS         10          /* 通讯/按键/告警 */
 #define BMS_TASK_MED_MS          100         /* 库仑计读取 */

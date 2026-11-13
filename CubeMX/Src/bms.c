@@ -467,7 +467,7 @@ void BMS_Init(void)
     s_idle_tracking = false;
 
     /* RTC + STOP 低功耗（初始化失败就自动退回常开模式） */
-    s_lp_enabled = LP_Init();
+    s_lp_enabled = CFG_LP_ENABLE && LP_Init();
 
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
     s_led_level = true;
