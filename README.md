@@ -21,13 +21,15 @@
 | 过流 / 短路 | 14A@80ms / ≈33.5A@200µs（档位离散，见 03 文档） |
 | 均衡 | 被动，3.90V 起，压差 30mV，约 35mA/节 |
 | 上报 | UART 115200，1Hz 二进制帧 + 可选文本帧 |
+| 待机 | STOP + RTC 1s 唤醒，平均 **<0.1mA**（原来 36mA，4 天 → 理论数年） |
+| 掉电保存 | Flash 末尾页追加式日志，SOC/容量/循环次数/历史故障不丢 |
 | 采样 | 单体电压 ±2mV、电流 ±1%、温度 ±0.5℃（校准后） |
 
 ## 2. 目录
 
 ```
 BMS-3S-F103/
-├── Firmware/Core/{Inc,Src}     纯代码，可挂到任意工程
+├── Firmware/Core/{Inc,Src}     纯代码（含 nvm.c 掉电保存、lp.c 低功耗）
 ├── CubeMX/                     ★ 已生成好的 CubeMX 工程（.ioc + Keil，编译通过）
 │   ├── BMS-3S-F103.ioc
 │   ├── Inc/ Src/ Drivers/
@@ -77,8 +79,10 @@ gcc -std=c99 -I host_check -I Firmware/Core/Inc host_check/test_main.c host_chec
   做 SOC 积分几小时就飘；BQ 的 CC 是 8.44µV/LSB，配 2mΩ 分流器约 4mA 分辨率。
 - **BMS ≠ 充电器**：CC/CV 由外部充电器完成，BMS 只决定"允不允许充"。
 - **均衡只在静置时做**：带载时测到的压差含 IR drop，会把好电芯误放掉。
-- **低功耗是这套方案的短板**：F103@72MHz 约 30mA，长期待机不合适。
-  要装进电池供电的产品，换 STM32L431 / G030，或让 MCU 定时唤醒（见 docs/03）。
+- **低功耗已经补上**：静置 10 秒后进 STOP，RTC 每秒唤醒采样、ALERT 立即唤醒，
+  平均 <0.1mA；睡眠前会关掉库仑计，避免 CC_READY 把 MCU 反复叫醒。
+- **状态要能掉电保留**：SOC、学习到的容量、循环次数、故障历史写 Flash 末尾页，
+  追加式日志 + CRC，写满才擦一次（32 条/擦除）。
 
 ## 7. 自测覆盖
 
@@ -91,6 +95,7 @@ gcc -std=c99 -I host_check -I Firmware/Core/Inc host_check/test_main.c host_chec
 | 5 | 主循环 | 1s 调度、遥测帧、默认 FET 状态 |
 | 6 | AFE 故障恢复 | 电压恢复后锁存位能清掉、CHG 不锁死 |
 | 7 | ALERT 抢占 | ALERT 每 10ms 来一次，SOC 仍正常积分 |
+| 8 | NVM | 追加写、写满擦页、坏记录自动回退 |
 
 ## 8. 安全声明
 

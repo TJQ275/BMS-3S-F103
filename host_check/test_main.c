@@ -8,6 +8,8 @@
 #include "soc.h"
 #include "protection.h"
 #include "protocol.h"
+#include "nvm.h"
+#include "nvm_port.h"
 
 void stub_afe_reset(void);
 void stub_afe_set_cell(int idx, uint16_t mv);
@@ -18,6 +20,9 @@ void stub_set_tick(uint32_t t);
 void stub_clear_uart(void);
 extern uint8_t  g_uart_tx[512];
 extern uint8_t  g_regs[256];
+void nvm_sim_reset(void);
+void nvm_sim_corrupt(uint32_t offset);
+extern int g_nvm_erase_count;
 extern uint16_t g_uart_tx_len;
 
 static int g_fail;
@@ -280,6 +285,46 @@ static void test_alert_keeps_soc(void)
     OK((s0 - s1) > 0.30f, "ALERT 频繁时 SOC 仍正常积分");
 }
 
+/* ---------------- 8. NVM 掉电保存 ---------------- */
+static void test_nvm(void)
+{
+    nvm_state_t a, b;
+
+    printf("[8] NVM 掉电保存\n");
+    nvm_sim_reset();
+
+    OK(!NVM_Load(&a), "空白页读不到数据");
+
+    a.soc_pct = 55.5f; a.remain_mah = 1942.5f; a.cap_mah = 3500.0f;
+    a.cycles_x10 = 12; a.faults_hist = 0x0005; a.uptime_s = 12345;
+    OK(NVM_Save(&a), "写入一条记录");
+
+    OK(NVM_Load(&b), "读回成功");
+    OK(fabsf(b.soc_pct - 55.5f) < 0.01f && fabsf(b.remain_mah - 1942.5f) < 0.1f &&
+       fabsf(b.cap_mah - 3500.0f) < 0.1f, "数值一致");
+    OK(b.cycles_x10 == 12 && b.faults_hist == 0x0005 && b.uptime_s == 12345,
+       "循环次数/故障/运行时间一致");
+
+    /* 连写 40 次，应触发一次整页擦除并从 0 重新写 */
+    int ok_cnt = 0;
+    for (int i = 0; i < 40; i++) {
+        a.soc_pct = 90.0f - i * 0.5f;
+        a.uptime_s = 20000u + (uint32_t)i;
+        if (NVM_Save(&a)) ok_cnt++;
+    }
+    OK(ok_cnt == 40, "连续写入 40 次全部成功");
+    OK(g_nvm_erase_count == 1, "写满 32 条后擦除 1 次");
+    OK(NVM_Load(&b) && fabsf(b.soc_pct - (90.0f - 39 * 0.5f)) < 0.01f, "擦页后仍能读回最新值");
+
+    /* 破坏最新一条的 CRC：应回退到上一条 */
+    uint8_t probe[32];
+    NVM_PortRead(8 * 32, probe, 32);       /* 首次 1 条 + 40 条，擦页后最新在第 9 槽 */
+    nvm_sim_corrupt(8 * 32 + 8);
+    nvm_state_t c;
+    OK(NVM_Load(&c), "坏记录被跳过，仍能加载");
+    OK(fabsf(c.soc_pct - (90.0f - 38 * 0.5f)) < 0.01f, "回退到上一条有效记录");
+}
+
 int main(void)
 {
     test_driver();
@@ -289,6 +334,7 @@ int main(void)
     test_bms();
     test_afe_recovery();
     test_alert_keeps_soc();
+    test_nvm();
 
     printf("\n%s (%d failed)\n", g_fail ? "FAILED" : "ALL PASS", g_fail);
     return g_fail ? 1 : 0;

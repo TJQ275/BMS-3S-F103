@@ -71,6 +71,7 @@ void     HAL_GPIO_Init(GPIO_TypeDef *p, GPIO_InitTypeDef *i);
 void     HAL_GPIO_WritePin(GPIO_TypeDef *p, uint16_t pin, uint32_t state);
 uint32_t HAL_GPIO_ReadPin(GPIO_TypeDef *p, uint16_t pin);
 HAL_StatusTypeDef HAL_ADC_Start_DMA(ADC_HandleTypeDef *h, uint32_t *buf, uint32_t len);
+HAL_StatusTypeDef HAL_ADC_Stop_DMA(ADC_HandleTypeDef *h);
 HAL_StatusTypeDef HAL_UART_Transmit(UART_HandleTypeDef *h, uint8_t *b, uint16_t n, uint32_t t);
 HAL_StatusTypeDef HAL_UART_Receive_IT(UART_HandleTypeDef *h, uint8_t *b, uint16_t n);
 HAL_StatusTypeDef HAL_IWDG_Refresh(IWDG_HandleTypeDef *h);

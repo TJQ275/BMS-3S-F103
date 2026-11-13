@@ -42,6 +42,9 @@ bool    BQ_GetFets(bool *chg_on, bool *dsg_on);
 /* 被动均衡：mask bit0=Cell1 ... bit4=Cell5，内部 FET 导通外接电阻放电 */
 bool    BQ_SetBalancing(uint8_t mask);
 
+/* 睡眠前关掉库仑计，避免 CC_READY 每 250ms 把 MCU 唤醒（此时无电流，不丢积分） */
+bool    BQ_SetCcEnabled(bool en);
+
 /* 进入 SHIP 模式（整机断电，电流 <1µA 级） */
 void    BQ_EnterShipMode(void);
 

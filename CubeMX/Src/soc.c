@@ -71,6 +71,19 @@ void SOC_MarkFull(void)
     s_calibrated = true;
 }
 
+void SOC_Restore(float pct, float remain_mah, uint32_t now_ms)
+{
+    if (pct < CFG_SOC_MIN_PCT) pct = CFG_SOC_MIN_PCT;
+    if (pct > CFG_SOC_MAX_PCT) pct = CFG_SOC_MAX_PCT;
+
+    s_soc_pct    = pct;
+    s_remain_mah = remain_mah;
+    s_last_ms    = now_ms;
+    s_idle_ms    = 0;
+    s_inited     = true;
+    s_calibrated = true;
+}
+
 void SOC_SetCapacity(float mah)
 {
     if (mah < 100.0f) return;

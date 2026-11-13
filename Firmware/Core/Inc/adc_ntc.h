@@ -12,6 +12,7 @@
 #define NTC_T0_K         298.15f
 
 void    NTC_Start(void);
+void    NTC_Restart(void);   /* STOP 唤醒后重新启动 ADC + DMA */
 int16_t NTC_GetTempC10(uint8_t idx);   /* idx: 0=MOS, 1=环境 */
 float   NTC_AdcToCelsius(uint16_t adc);
 

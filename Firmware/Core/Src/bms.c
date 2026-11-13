@@ -11,6 +11,8 @@
 #include "soc.h"
 #include "balancing.h"
 #include "adc_ntc.h"
+#include "nvm.h"
+#include "lp.h"
 
 #include <string.h>
 
@@ -28,9 +30,19 @@ static uint8_t  s_fet_state;
 static bool     s_text_mode;
 static uint16_t s_vmin;
 
-static uint32_t s_t_fast, s_t_med, s_t_slow, s_t_led;
+static uint32_t s_t_fast, s_t_med, s_t_slow, s_t_led, s_t_save;
 static bool     s_led_level;
 static bool     s_full_reported;
+
+/* NVM：循环次数、历史故障、放电累计 */
+static uint16_t s_cycles_x10;
+static uint16_t s_fault_hist;
+static uint32_t s_uptime_base;
+static float    s_disch_mah;
+static uint32_t s_last_rx_ms;      /* 最近一次收到上位机字节的时间 */
+static uint32_t s_idle_since;      /* 进入静置的时间 */
+static bool     s_idle_tracking;
+static bool     s_lp_enabled;
 
 /* ---------------- 小工具 ---------------- */
 static uint16_t cells_min(void)
@@ -300,6 +312,35 @@ static void bms_cmd_handler(uint8_t cmd, const uint8_t *data, uint8_t len,
     }
 }
 
+/* ---------------- 低功耗 ---------------- */
+static bool charger_present(void)
+{
+    return HAL_GPIO_ReadPin(CHG_DET_GPIO_Port, CHG_DET_Pin) == GPIO_PIN_SET;
+}
+
+/* 静置 10s（无充放电、无故障、上位机不通讯）后进 STOP：
+ * RTC 每秒唤醒一次做完整周期，ALERT 拉高立即唤醒。 */
+static void low_power_service(uint32_t now_ms)
+{
+    if (!s_lp_enabled) return;
+
+    bool quiet = (s_prot.active == 0) &&
+                 (s_current_ma > -CFG_BAL_IDLE_MA) &&
+                 (s_current_ma < CFG_BAL_IDLE_MA) &&
+                 !charger_present() &&
+                 ((uint32_t)(now_ms - s_last_rx_ms) > 10000u);
+
+    if (!quiet) { s_idle_tracking = false; return; }
+    if (!s_idle_tracking) { s_idle_tracking = true; s_idle_since = now_ms; return; }
+    if ((uint32_t)(now_ms - s_idle_since) < 10000u) return;
+
+    LP_SleepUntilEvent();
+
+    /* 醒来：让主循环立刻再跑一次完整周期 */
+    s_alert_pending = true;
+    s_t_slow = HAL_GetTick() - BMS_TASK_SLOW_MS;
+}
+
 /* ---------------- 1s 主任务 ---------------- */
 static void slow_service(uint32_t now_ms)
 {
@@ -342,6 +383,16 @@ static void slow_service(uint32_t now_ms)
         s_full_reported = false;
     }
 
+    /* 故障历史变化立即落盘；平时 5 分钟落一次 */
+    if (s_fault_hist != (uint16_t)(s_prot.latched & 0xFFFFu)) {
+        s_fault_hist = (uint16_t)(s_prot.latched & 0xFFFFu);
+        (void)BMS_SaveState();
+        s_t_save = now_ms;
+    } else if ((uint32_t)(now_ms - s_t_save) >= 300000u) {
+        (void)BMS_SaveState();
+        s_t_save = now_ms;
+    }
+
     update_telemetry();
     buzzer_service();
 
@@ -349,6 +400,9 @@ static void slow_service(uint32_t now_ms)
     else             Proto_SendTelemetry(&s_tel);
 
     led_service(now_ms);
+
+    /* 放最后：一旦进 STOP 就会阻塞到下次唤醒 */
+    low_power_service(now_ms);
 }
 
 /* ---------------- 对外接口 ---------------- */
@@ -387,6 +441,19 @@ void BMS_Init(void)
     Prot_Init();
     Bal_Init();
 
+    /* 从 Flash 恢复：SOC/容量、循环次数、历史故障 */
+    {
+        nvm_state_t nst;
+        if (NVM_Load(&nst)) {
+            SOC_Restore(nst.soc_pct, nst.remain_mah, now);
+            if (nst.cap_mah > 500.0f) SOC_SetCapacity(nst.cap_mah);
+            s_cycles_x10  = nst.cycles_x10;
+            s_fault_hist  = nst.faults_hist;
+            s_uptime_base = nst.uptime_s;
+        }
+    }
+    s_t_save = now;
+
     if (s_afe_ok) {
         (void)BQ_SetFets(true, true);
         s_fet_state = 0x03;
@@ -395,6 +462,12 @@ void BMS_Init(void)
     update_telemetry();
 
     (void)HAL_UART_Receive_IT(&huart1, &s_rx_byte, 1);
+
+    s_last_rx_ms   = now;
+    s_idle_tracking = false;
+
+    /* RTC + STOP 低功耗（初始化失败就自动退回常开模式） */
+    s_lp_enabled = LP_Init();
 
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
     s_led_level = true;
@@ -437,6 +510,17 @@ void BMS_Task(void)
         if (BQ_ReadCurrent(&ma, &fresh) && fresh) {
             s_current_ma = ma;
             SOC_Update(s_current_ma, s_vmin, now);
+
+            /* 放电量累计 -> 循环次数（满容量放完算 1 次，x10 记录） */
+            if (ma < 0) {
+                float cap;
+                s_disch_mah += (float)(-ma) * 0.1f / 3600.0f;
+                cap = SOC_GetCapacityMah();
+                if (cap > 100.0f && s_disch_mah >= cap) {
+                    s_disch_mah -= cap;
+                    if (s_cycles_x10 < 60000u) s_cycles_x10 += 10u;
+                }
+            }
         }
     }
 
@@ -452,6 +536,20 @@ void BMS_OnAlertIrq(void)
     s_alert_pending = true;
 }
 
+bool BMS_SaveState(void)
+{
+    nvm_state_t st;
+
+    st.soc_pct     = SOC_GetPercent();
+    st.remain_mah  = SOC_GetRemainingMah();
+    st.cap_mah     = SOC_GetCapacityMah();
+    st.cycles_x10  = s_cycles_x10;
+    st.faults_hist = s_fault_hist;
+    st.uptime_s    = s_uptime_base + HAL_GetTick() / 1000u;
+
+    return NVM_Save(&st);
+}
+
 const proto_telemetry_t *BMS_GetTelemetry(void) { return &s_tel; }
 const prot_state_t      *BMS_GetProtection(void) { return &s_prot; }
 const bq_sample_t       *BMS_GetSample(void) { return &s_sample; }
@@ -461,8 +559,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == USART1) {
         Proto_RxByte(s_rx_byte);
+        s_last_rx_ms = HAL_GetTick();
         (void)HAL_UART_Receive_IT(&huart1, &s_rx_byte, 1);
     }
+}
+
+void BMS_RestartRx(void)
+{
+    (void)HAL_UART_Receive_IT(&huart1, &s_rx_byte, 1);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)

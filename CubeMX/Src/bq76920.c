@@ -294,6 +294,14 @@ bool BQ_GetFets(bool *chg_on, bool *dsg_on)
     return true;
 }
 
+bool BQ_SetCcEnabled(bool en)
+{
+    uint8_t v = 0;
+    if (!bq_rd(REG_SYS_CTRL2, &v, 1)) return false;
+    if (en) v |= 0x40; else v &= (uint8_t)~0x40;
+    return bq_wr(REG_SYS_CTRL2, v);
+}
+
 bool BQ_SetBalancing(uint8_t mask)
 {
     mask &= (uint8_t)((1u << BMS_CELL_COUNT) - 1u);

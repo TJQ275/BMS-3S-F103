@@ -41,8 +41,10 @@ Program Size: Code=19298 RO-data=650 RW-data=136 ZI-data=2216
 
 ## 3. 本项目加进工程的文件
 
-`Src/`：`bms.c  bq76920.c  soc.c  protection.c  balancing.c  protocol.c  adc_ntc.c`
-`Inc/`：`bms.h  bq76920.h  soc.h  protection.h  balancing.h  protocol.h  adc_ntc.h  bms_config.h  bms_hal.h`
+`Src/`：`bms.c  bq76920.c  soc.c  protection.c  balancing.c  protocol.c  adc_ntc.c  nvm.c  nvm_port_stm32.c  lp.c`
+`Inc/`：`bms.h  bq76920.h  soc.h  protection.h  balancing.h  protocol.h  adc_ntc.h  nvm.h  nvm_port.h  lp.h  bms_config.h  bms_hal.h`
+
+> `nvm.c` 用最后一页 Flash（0x0800FC00）做掉电保存，`lp.c` 用 RTC 闹钟 + STOP 做低功耗。
 
 `main.c` 里只加了 3 行（在 USER CODE 段，重新生成代码不会被删）：
 
@@ -59,8 +61,16 @@ BMS_Task();           /* USER CODE BEGIN 3 */
    要毫秒级故障上报：CubeMX → System Core → NVIC → 勾 `EXTI line0 interrupt` → 重新生成，
    `stm32f1xx_it.c` 会生成 handler，自动回调 `bms.c` 里的 `HAL_GPIO_EXTI_Callback`。
    （自己手写 handler 会和启动文件的弱符号冲突，Keil AC5 报 L6200E，别踩这个坑。）
-2. **重新生成代码后**：CubeMX 会重写 `.uvprojx`，本项目那 7 个 `.c` 可能从 Keil 工程里消失
+2. **重新生成代码后**：CubeMX 会重写 `.uvprojx`，本项目那 10 个 `.c` 可能从 Keil 工程里消失
    （文件还在磁盘上）。到 Keil 里 `Add Existing Files to Group 'Application/User/Core'` 重新加一次即可。
+
+3. **RTC / EXTI0 不在 .ioc 里**：低功耗所需的 LSI、RTC 闹钟、EXTI0 中断都是
+   `lp.c` 在运行时直接配置的，CubeMX 重新生成不会破坏它们，也不需要勾任何选项。
+   只有 `EXTI0_IRQHandler` / `RTC_IRQHandler` 是在 C 里定义的——如果哪天你在 CubeMX 里
+   勾了 EXTI line0 并重新生成，`stm32f1xx_it.c` 会产生同名函数，需要删掉 `lp.c` 里那份。
+
+4. **IWDG 与 STOP**：看门狗在 STOP 期间仍在计数，代码在睡前/醒后各喂一次；
+   睡眠周期约 1s，2s 超时够用。如果改长睡眠，记得同步加大 IWDG 重装值。
 
 ## 5. 烧录
 

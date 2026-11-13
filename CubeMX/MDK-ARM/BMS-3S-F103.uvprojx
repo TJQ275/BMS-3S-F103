@@ -432,6 +432,21 @@
               <FilePath>../Src/adc_ntc.c</FilePath>
             </File>
             <File>
+              <FileName>nvm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Src/nvm.c</FilePath>
+            </File>
+            <File>
+              <FileName>nvm_port_stm32.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Src/nvm_port_stm32.c</FilePath>
+            </File>
+            <File>
+              <FileName>lp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Src/lp.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Src/main.c</FilePath>
@@ -561,6 +576,7 @@
               <FileType>1</FileType>
               <FilePath>../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c</FilePath>
             </File>
+
           </Files>
         </Group>
         <Group>

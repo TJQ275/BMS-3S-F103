@@ -2,6 +2,7 @@
 #include "main.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <math.h>
 
 I2C_HandleTypeDef  hi2c1;
@@ -94,6 +95,7 @@ void     HAL_GPIO_WritePin(GPIO_TypeDef *p, uint16_t pin, uint32_t st)
 uint32_t HAL_GPIO_ReadPin(GPIO_TypeDef *p, uint16_t pin) { (void)p; (void)pin; return 1u; }
 HAL_StatusTypeDef HAL_ADC_Start_DMA(ADC_HandleTypeDef *h, uint32_t *b, uint32_t n)
 { (void)h; (void)b; (void)n; return HAL_OK; }
+HAL_StatusTypeDef HAL_ADC_Stop_DMA(ADC_HandleTypeDef *h) { (void)h; return HAL_OK; }
 
 HAL_StatusTypeDef HAL_UART_Transmit(UART_HandleTypeDef *h, uint8_t *b, uint16_t n, uint32_t t)
 {
@@ -110,6 +112,10 @@ HAL_StatusTypeDef HAL_UART_Receive_IT(UART_HandleTypeDef *h, uint8_t *b, uint16_
 
 HAL_StatusTypeDef HAL_IWDG_Refresh(IWDG_HandleTypeDef *h) { (void)h; return HAL_OK; }
 void HAL_NVIC_SetPriority(int irq, uint32_t pre, uint32_t sub) { (void)irq; (void)pre; (void)sub; }
+
+/* 低功耗在 PC 上不启用 */
+bool LP_Init(void) { return false; }
+void LP_SleepUntilEvent(void) { }
 void HAL_NVIC_EnableIRQ(int irq) { (void)irq; }
 void HAL_GPIO_EXTI_IRQHandler(uint16_t pin) { (void)pin; }
 

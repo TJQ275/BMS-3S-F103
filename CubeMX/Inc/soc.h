@@ -11,6 +11,7 @@
 void  SOC_Init(uint32_t now_ms, uint16_t cell_min_mv, bool voltage_valid);
 void  SOC_Update(int32_t current_ma, uint16_t cell_min_mv, uint32_t now_ms);
 void  SOC_MarkFull(void);          /* 充满时调用，重新对齐 100% */
+void  SOC_Restore(float pct, float remain_mah, uint32_t now_ms);  /* 从 NVM 恢复 */
 void  SOC_SetCapacity(float mah);  /* 实测容量后更新 */
 
 float SOC_GetPercent(void);

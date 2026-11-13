@@ -19,6 +19,13 @@ void NTC_Start(void)
     s_started = true;
 }
 
+void NTC_Restart(void)
+{
+    (void)HAL_ADC_Stop_DMA(&hadc1);
+    s_started = false;
+    NTC_Start();
+}
+
 float NTC_AdcToCelsius(uint16_t adc)
 {
     float r, t;
