@@ -10,9 +10,8 @@ CubeMX/
 ├── Src/                     ← 生成的 .c + 本项目的 bms_*.c
 ├── Drivers/                 ← HAL + CMSIS（CubeMX 自动拷贝）
 └── MDK-ARM/
-    ├── BMS-3S-F103.uvprojx  ← Keil 工程
-    ├── BMS-3S-F103.hex      ← 已编译好的固件（可直接烧）
-    └── build.log 不包含
+    ├── BMS-3S-F103.uvprojx  ← Keil 工程（F7 编译 / F8 下载）
+    └── BMS-3S-F103/         ← 编译输出目录，.axf/.hex 在这里（未纳入 git）
 ```
 
 ## 1. 打开方式
